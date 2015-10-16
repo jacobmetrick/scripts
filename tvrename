@@ -1,0 +1,45 @@
+#!/usr/bin/python2
+
+import argparse
+import os
+import subprocess
+
+tvInputDir = "/mnt/array/data/Downloads/TV"
+tvOutputDir = "/mnt/array/data/TV"
+
+videoMinFileSize = 5000000
+
+processArgList = ["filebot", "-non-strict", "--action", "copy", "--db", "TheTVDB", "--output", tvOutputDir,
+        "--format", "{n}/Season {s.pad(2)}/{n} - {s}x{e.pad(2)} - {t}", "-rename"]
+
+# terrible hack to determine if a file is a video or not
+def fileIsVideo(file):
+    return os.stat(file).st_size >= videoMinFileSize
+
+parser = argparse.ArgumentParser(description='Rename and move TV shows.')
+parser.add_argument('oldestfile', help="Oldest file that should be imported")
+
+args = parser.parse_args()
+
+oldestTime = os.stat(args.oldestfile).st_mtime
+
+fileList = os.listdir(tvInputDir)
+
+fileList = [x for x in fileList if oldestTime <= os.stat(x).st_mtime]
+
+outputList = []
+
+# get files in this directory that are newer
+for file in fileList:
+    if fileIsVideo(file) and os.path.isfile(file):
+        outputList.append(file)
+
+# get recursive directory's children
+for rootLevelFile in fileList:
+    for root, dirs, files in os.walk(rootLevelFile):
+        for childFile in files:
+            fullFileName = os.path.join(root, childFile)
+            if fileIsVideo(fullFileName):
+                outputList.append(fullFileName)
+
+subprocess.call(processArgList + outputList)
